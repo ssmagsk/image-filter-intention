@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -154,7 +155,9 @@ private fun CameraXScreen(
     var permissionRequested by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedFilter by remember { mutableStateOf(filters.first()) }
-    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_FRONT) }
+    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
+
+    val imageRotation = if (lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -279,7 +282,7 @@ private fun CameraXScreen(
                     contentDescription = "Last captured preview",
                     modifier = Modifier
                         // HACK(ATHON) BECAUSE IMAGE GETS CAPTURED AN AN ANGLE
-                        .rotate(-90f)
+                        .rotate(imageRotation)
                         .weight(5f)
                         .widthIn(max = 360.dp)
                         .padding(vertical = 16.dp)
