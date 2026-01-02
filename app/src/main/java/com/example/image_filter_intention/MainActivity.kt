@@ -2,6 +2,7 @@ package com.example.image_filter_intention
 
 import android.Manifest
 import android.graphics.Bitmap
+import android.graphics.Bitmap.createBitmap
 import android.graphics.PointF
 import android.os.Bundle
 import android.util.Log
@@ -36,7 +37,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,15 +70,16 @@ class MainActivity : ComponentActivity() {
                         filters = filterOptions(),
                         processBitmap = { bmp, filter ->
                             when (filter.id) {
-                        FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
-                        FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
-                        FilterIds.Bloom -> processWithNative(bmp, ::applyBloom)
-                        FilterIds.GPUBloom -> processWithGpuBloom(bmp)
-                        FilterIds.YuvGrayscale -> processWithYuvGrayscale(bmp)
-                        else -> processWithNative(bmp, ::applyNegative)
+                                FilterIds.NEGATIVE -> processWithNative(bmp, ::applyNegative)
+                                FilterIds.GRAYSCALE -> processWithNative(bmp, ::applyGrayscale)
+                                FilterIds.BLOOM -> processWithNative(bmp, ::applyBloom)
+                                FilterIds.GPU_BLOOM -> processWithGpuBloom(bmp)
+                                FilterIds.YUV_GRAYSCALE -> processWithYuvGrayscale(bmp)
+                                else -> {
+                                     bmp
+                                }
                             }
-                        },
-                        onBitmapCaptured = { /* hook for further actions if needed */ }
+                        }
                     )
                 }
             }
@@ -122,7 +123,7 @@ class MainActivity : ComponentActivity() {
             val outputArray = nativeFn(inputArray, width, height)
             if (outputArray.size != capacity) return null
             val outBuffer = ByteBuffer.wrap(outputArray)
-            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
                 copyPixelsFromBuffer(outBuffer)
             }
         } catch (t: Throwable) {
@@ -149,7 +150,7 @@ class MainActivity : ComponentActivity() {
         val outBytes = gpuBloom.applyBloom(inputArray, width, height) ?: return null
         if (outBytes.size != capacity) return null
         val outBuffer = ByteBuffer.wrap(outBytes)
-        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+        return createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
             copyPixelsFromBuffer(outBuffer)
         }
     }
@@ -181,7 +182,7 @@ class MainActivity : ComponentActivity() {
             val outputArray = applyGrayscaleYuv(yPlane, width, height)
             if (outputArray.size != pixelCount * 4) return null
             val outBuffer = ByteBuffer.wrap(outputArray)
-            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
                 copyPixelsFromBuffer(outBuffer)
             }
         } catch (t: Throwable) {
@@ -192,37 +193,36 @@ class MainActivity : ComponentActivity() {
 }
 
 private object FilterIds {
-    const val Negative = "negative"
-    const val Grayscale = "grayscale"
-    const val Bloom = "bloom"
-    const val GPUBloom = "gpu_bloom"
-    const val YuvGrayscale = "yuv_grayscale"
+    const val NONE = "none"
+    const val NEGATIVE = "negative"
+    const val GRAYSCALE = "grayscale"
+    const val BLOOM = "bloom"
+    const val GPU_BLOOM = "gpu_bloom"
+    const val YUV_GRAYSCALE = "yuv_grayscale"
 }
 
 private data class FilterOption(val id: String, val label: String)
 
 private fun filterOptions(): List<FilterOption> = listOf(
-    FilterOption(FilterIds.Negative, "Negative"),
-    FilterOption(FilterIds.Grayscale, "Grayscale"),
-    FilterOption(FilterIds.Bloom, "Bloom"),
-    FilterOption(FilterIds.GPUBloom, "GPU Bloom"),
-    FilterOption(FilterIds.YuvGrayscale, "Y Gray (YUV)")
+    FilterOption(FilterIds.NONE, "None"),
+    FilterOption(FilterIds.NEGATIVE, "Negative"),
+    FilterOption(FilterIds.GRAYSCALE, "Grayscale"),
+    FilterOption(FilterIds.BLOOM, "Bloom"),
+    FilterOption(FilterIds.GPU_BLOOM, "GPU Bloom"),
+    FilterOption(FilterIds.YUV_GRAYSCALE, "Y Gray (YUV)")
 )
 
 @Composable
 private fun CameraXScreen(
     filters: List<FilterOption>,
-    processBitmap: (Bitmap, FilterOption) -> Bitmap?,
-    onBitmapCaptured: (Bitmap) -> Unit
+    processBitmap: (Bitmap, FilterOption) -> Bitmap?
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val coroutineScope = rememberCoroutineScope()
     val imageConverter: IImageConverter = remember { CPUImageConverter() }
 
     var hasPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
-    var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var liveBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var faceLandmarks by remember { mutableStateOf<FaceLandmarks?>(null) }
     var selectedFilter by remember { mutableStateOf(filters.first()) }
