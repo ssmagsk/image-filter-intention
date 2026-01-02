@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -228,6 +230,7 @@ private fun CameraXScreen(
     var selectedFilter by remember { mutableStateOf(filters.first()) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var imageRotation by remember { mutableFloatStateOf(-90f) }
+    var faceEnabled by remember { mutableStateOf(true) }
 
     val faceRecognizer = remember { FaceRecognizer() }
     val requestPermissionLauncher = rememberLauncherForActivityResult(
@@ -252,8 +255,13 @@ private fun CameraXScreen(
         ) { image: ImageProxy ->
             val rgba = imageConverter.yuvToRgba(image)
             liveBitmap = rgba?.let { imageConverter.rgbaToBitmap(it) }
-            faceRecognizer.process(image) { landmarks ->
-                faceLandmarks = landmarks
+            if (faceEnabled) {
+                faceRecognizer.process(image) { landmarks ->
+                    faceLandmarks = landmarks
+                }
+            } else {
+                faceLandmarks = null
+                image.close()
             }
         }
     }
@@ -293,6 +301,7 @@ private fun CameraXScreen(
         ) {
             Box(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .weight(5f)
                     .padding(bottom = 16.dp)
             ) {
@@ -300,6 +309,17 @@ private fun CameraXScreen(
                     factory = { previewView },
                     modifier = Modifier.matchParentSize()
                 )
+                Button(
+                    onClick = { faceEnabled = !faceEnabled },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (faceEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text(text = if (faceEnabled) "Face: On" else "Face: Off")
+                }
                 Button(
                     onClick = {
                         lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
