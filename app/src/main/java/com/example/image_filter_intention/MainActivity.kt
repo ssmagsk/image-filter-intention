@@ -43,11 +43,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.drawscope.draw
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.image_filter_intention.converter.CPUImageConverter
@@ -381,6 +386,15 @@ private fun CameraXScreen(
                             .padding(vertical = 16.dp)
                     )
                     faceLandmarks?.let { landmarks ->
+                        val logoPainter = rememberVectorPainter(
+                            image = ImageVector.vectorResource(id = R.drawable.ss_logo)
+                        )
+                        val logoSize = logoPainter.intrinsicSize.let { sz ->
+                            if (sz.isSpecified) sz else Size(40f, 40f)
+                        }
+                        val halfLogoWidth = logoSize.width / 2f
+                        val halfLogoHeight = logoSize.height / 2f
+
                         Canvas(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -390,18 +404,20 @@ private fun CameraXScreen(
                             val h = size.height
                             val imgW = liveBitmap?.width?.toFloat() ?: w
                             val imgH = liveBitmap?.height?.toFloat() ?: h
-                            fun drawPoint(p: PointF?, color: Color) {
+                            fun drawLogo(p: PointF?) {
                                 if (p == null) return
                                 // HACK(ATHON) 125 because who knows ( How did I even figure this one out)
                                 val sx = p.x / imgW * w + 125
                                 val sy = p.y / imgH * h - 125
-                                drawCircle(color = color, radius = 8f, center = Offset(sx, sy))
+                                translate(left = sx - halfLogoWidth, top = sy - halfLogoHeight) {
+                                    with(logoPainter) {
+                                        draw(size = logoSize)
+                                    }
+                                }
                             }
-                            drawPoint(landmarks.leftEye, Color.Green)
-                            drawPoint(landmarks.rightEye, Color.Blue)
-                            drawPoint(landmarks.mouthBottom, Color.Red)
-                            drawPoint(landmarks.mouthRight, Color.Red)
-                            drawPoint(landmarks.mouthLeft, Color.Red)
+                            drawLogo(landmarks.leftEye)
+                            drawLogo(landmarks.rightEye)
+                            drawLogo(landmarks.mouthBottom)
 
                         }
                     }
