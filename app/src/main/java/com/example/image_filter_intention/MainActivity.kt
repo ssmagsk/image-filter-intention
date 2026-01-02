@@ -52,6 +52,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.io.File
+import androidx.core.graphics.createBitmap
 
 class MainActivity : ComponentActivity() {
 
@@ -81,10 +82,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * A native method that is implemented by the 'image_filter_intention' native library,
+     * Native methods that are implemented by the 'image_filter_intention' native library,
      * which is packaged with this application.
      */
-    external fun stringFromJNI(): String
     external fun applyGrayscale(input: ByteArray, width: Int, height: Int): ByteArray
     external fun applyNegative(input: ByteArray, width: Int, height: Int): ByteArray
 
@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
             val outputArray = nativeFn(inputArray, width, height)
             if (outputArray.size != capacity) return null
             val outBuffer = ByteBuffer.wrap(outputArray)
-            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            createBitmap(width, height).apply {
                 copyPixelsFromBuffer(outBuffer)
             }
         } catch (t: Throwable) {
