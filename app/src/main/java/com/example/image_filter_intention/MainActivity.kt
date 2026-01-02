@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     CameraXScreen(
                         nativeBanner = stringFromJNI(),
+                        processBitmap = ::processWithNativeGrayscale,
                         onBitmapCaptured = { bitmap ->
                             // TODO: Pass bitmap to NDK for processing (grayscale filter)
                         }
@@ -73,6 +76,7 @@ class MainActivity : ComponentActivity() {
      * which is packaged with this application.
      */
     external fun stringFromJNI(): String
+    external fun applyGrayscale(input: ByteArray, width: Int, height: Int): ByteArray
 
     companion object {
         // Used to load the 'image_filter_intention' library on application startup.
@@ -80,11 +84,39 @@ class MainActivity : ComponentActivity() {
             System.loadLibrary("image_filter_intention")
         }
     }
+
+    private fun processWithNativeGrayscale(source: Bitmap): Bitmap? {
+        val argb = if (source.config == Bitmap.Config.ARGB_8888) {
+            source
+        } else {
+            source.copy(Bitmap.Config.ARGB_8888, /* mutable = */ false)
+        } ?: return null
+
+        val width = argb.width
+        val height = argb.height
+        val capacity = width * height * 4
+        val buffer = ByteBuffer.allocate(capacity)
+        argb.copyPixelsToBuffer(buffer)
+        val inputArray = buffer.array()
+
+        return try {
+            val outputArray = applyGrayscale(inputArray, width, height)
+            if (outputArray.size != capacity) return null
+            val outBuffer = ByteBuffer.wrap(outputArray)
+            val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            result.copyPixelsFromBuffer(outBuffer)
+            result
+        } catch (t: Throwable) {
+            Log.e("NDK", "Grayscale processing failed", t)
+            null
+        }
+    }
 }
 
 @Composable
 private fun CameraXScreen(
     nativeBanner: String,
+    processBitmap: (Bitmap) -> Bitmap?,
     onBitmapCaptured: (Bitmap) -> Unit
 ) {
     val context = LocalContext.current
@@ -193,8 +225,9 @@ private fun CameraXScreen(
                                     runCatching {
                                         BitmapFactory.decodeFile(output.absolutePath)
                                     }.getOrNull()?.let { bmp ->
-                                        lastBitmap = bmp
-                                        onBitmapCaptured(bmp)
+                                        val processed = processBitmap(bmp)
+                                        lastBitmap = processed ?: bmp
+                                        onBitmapCaptured(lastBitmap!!)
                                     }
                                     output.delete()
                                 }
