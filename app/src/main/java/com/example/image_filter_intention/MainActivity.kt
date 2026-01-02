@@ -250,7 +250,7 @@ private fun CameraXScreen(
                 containerColor = MaterialTheme.colorScheme.primary
             )
         ) {
-            Text(text = "Open Camera")
+            Text(text = "Snappity Snap")
         }
     }
 }
