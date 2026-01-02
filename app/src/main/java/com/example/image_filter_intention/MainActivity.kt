@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -126,6 +127,7 @@ private fun CameraXScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var hasPermission by remember { mutableStateOf(false) }
+    var permissionRequested by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
@@ -147,6 +149,13 @@ private fun CameraXScreen(
     }
 
     val previewView = remember { PreviewView(context) }
+
+    LaunchedEffect(hasPermission, permissionRequested) {
+        if (!hasPermission && !permissionRequested) {
+            permissionRequested = true
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     DisposableEffect(lifecycleOwner, hasPermission) {
         if (!hasPermission) {
