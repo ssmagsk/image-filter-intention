@@ -154,6 +154,7 @@ private fun CameraXScreen(
     var permissionRequested by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedFilter by remember { mutableStateOf(filters.first()) }
+    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_FRONT) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -161,9 +162,9 @@ private fun CameraXScreen(
         hasPermission = granted
     }
 
-    val cameraSelector = remember {
+    val cameraSelector = remember(lensFacing) {
         CameraSelector.Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+            .requireLensFacing(lensFacing)
             .build()
     }
 
@@ -182,7 +183,7 @@ private fun CameraXScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, hasPermission) {
+    DisposableEffect(lifecycleOwner, hasPermission, lensFacing) {
         if (!hasPermission) {
             return@DisposableEffect onDispose { }
         }
@@ -221,16 +222,32 @@ private fun CameraXScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize()
         ) {
-//            Text(text = nativeBanner, style = MaterialTheme.typography.titleMedium)
-//            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.weight(5f)
+            Box(
+                modifier = Modifier
+                    .weight(5f)
+                    .padding(bottom = 16.dp)
             ) {
                 AndroidView(
                     factory = { previewView },
-                    modifier = Modifier
-                        .padding(bottom = 16.dp)
+                    modifier = Modifier.matchParentSize()
                 )
+                Button(
+                    onClick = {
+                        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
+                            CameraSelector.LENS_FACING_BACK
+                        } else {
+                            CameraSelector.LENS_FACING_FRONT
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text(text = "Flip")
+                }
             }
             Row(
                 modifier = Modifier
