@@ -61,10 +61,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     CameraXScreen(
                         nativeBanner = stringFromJNI(),
-                        processBitmap = ::processWithNativeNegative,
-                        onBitmapCaptured = { bitmap ->
-                            // TODO: Pass bitmap to NDK for processing (grayscale filter)
-                        }
+                        processBitmap = { bmp -> processWithNative(bmp, ::applyNegative) },
+                        onBitmapCaptured = { /* hook for further actions if needed */ }
                     )
                 }
             }
@@ -86,7 +84,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun processWithNativeGrayscale(source: Bitmap): Bitmap? {
+    private fun processWithNative(
+        source: Bitmap,
+        nativeFn: (ByteArray, Int, Int) -> ByteArray
+    ): Bitmap? {
         val argb = if (source.config == Bitmap.Config.ARGB_8888) {
             source
         } else {
@@ -101,41 +102,14 @@ class MainActivity : ComponentActivity() {
         val inputArray = buffer.array()
 
         return try {
-            val outputArray = applyGrayscale(inputArray, width, height)
+            val outputArray = nativeFn(inputArray, width, height)
             if (outputArray.size != capacity) return null
             val outBuffer = ByteBuffer.wrap(outputArray)
-            val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            result.copyPixelsFromBuffer(outBuffer)
-            result
+            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                copyPixelsFromBuffer(outBuffer)
+            }
         } catch (t: Throwable) {
-            Log.e("NDK", "Grayscale processing failed", t)
-            null
-        }
-    }
-
-    private fun processWithNativeNegative(source: Bitmap): Bitmap? {
-        val argb = if (source.config == Bitmap.Config.ARGB_8888) {
-            source
-        } else {
-            source.copy(Bitmap.Config.ARGB_8888, /* mutable = */ false)
-        } ?: return null
-
-        val width = argb.width
-        val height = argb.height
-        val capacity = width * height * 4
-        val buffer = ByteBuffer.allocate(capacity)
-        argb.copyPixelsToBuffer(buffer)
-        val inputArray = buffer.array()
-
-        return try {
-            val outputArray = applyNegative(inputArray, width, height)
-            if (outputArray.size != capacity) return null
-            val outBuffer = ByteBuffer.wrap(outputArray)
-            val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            result.copyPixelsFromBuffer(outBuffer)
-            result
-        } catch (t: Throwable) {
-            Log.e("NDK", "Negative processing failed", t)
+            Log.e("NDK", "Native processing failed", t)
             null
         }
     }
