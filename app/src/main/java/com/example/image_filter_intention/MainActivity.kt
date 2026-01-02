@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -156,8 +157,8 @@ private fun CameraXScreen(
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedFilter by remember { mutableStateOf(filters.first()) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
+    var imageRotation by remember { mutableFloatStateOf(-90f) }
 
-    val imageRotation = if (lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -184,6 +185,10 @@ private fun CameraXScreen(
             permissionRequested = true
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
+    }
+
+    LaunchedEffect(lastBitmap) {
+        imageRotation = if (lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
     }
 
     DisposableEffect(lifecycleOwner, hasPermission, lensFacing) {
