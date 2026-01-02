@@ -308,7 +308,7 @@ private fun CameraXScreen(
             processBitmap(liveBitmap ?: return, selectedFilter)?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Last captured preview",
+                    contentDescription = "Filtered preview",
                     modifier = Modifier
                         // HACK(ATHON) BECAUSE IMAGE GETS CAPTURED AN AN ANGLE
                         .rotate(imageRotation)
@@ -316,53 +316,6 @@ private fun CameraXScreen(
                         .widthIn(max = 360.dp)
                         .padding(vertical = 16.dp)
                 )
-            }
-
-            Button(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(bottom = 24.dp)
-                    .widthIn(min = 240.dp),
-                onClick = {
-//                    if (!hasPermission) {
-//                        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-//                    } else {
-//                        val output = File.createTempFile(
-//                            "capture-",
-//                            ".jpg",
-//                            context.cacheDir
-//                        )
-//                        val outputOptions = ImageCapture.OutputFileOptions.Builder(output).build()
-//                        val executor = ContextCompat.getMainExecutor(context)
-//                        imageCapture.takePicture(
-//                            outputOptions,
-//                            executor,
-//                            object : ImageCapture.OnImageSavedCallback {
-//                                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-//                                    coroutineScope.launch {
-//                                        runCatching {
-//                                            BitmapFactory.decodeFile(output.absolutePath)
-//                                        }.getOrNull()?.let { bmp ->
-//                                            val processed = processBitmap(bmp, selectedFilter)
-//                                            lastBitmap = processed ?: bmp
-//                                            onBitmapCaptured(lastBitmap!!)
-//                                        }
-//                                        output.delete()
-//                                    }
-//                                }
-//
-//                                override fun onError(exception: ImageCaptureException) {
-//                                    // TODO: show error UI/log
-//                                }
-//                            }
-//                        )
-//                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(text = "Snappity Snap")
             }
         }
     }
