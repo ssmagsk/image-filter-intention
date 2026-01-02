@@ -39,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -209,6 +210,8 @@ private fun CameraXScreen(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = "Last captured preview",
                     modifier = Modifier
+                        // HACK(ATHON) BECAUSE IMAGE GETS CAPTURED AN AN ANGLE
+                        .rotate(-90f)
                         .widthIn(max = 360.dp)
                         .padding(vertical = 16.dp)
                 )
