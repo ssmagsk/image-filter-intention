@@ -59,6 +59,54 @@ Java_com_example_image_1filter_1intention_MainActivity_applyGrayscale(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_example_image_1filter_1intention_MainActivity_applyGrayscaleYuv(
+        JNIEnv* env,
+        jobject /* this */,
+        jbyteArray yPlane,
+        jint width,
+        jint height) {
+    if (width <= 0 || height <= 0) {
+        return env->NewByteArray(0);
+    }
+
+    const jsize y_length = env->GetArrayLength(yPlane);
+    const jsize expected_y = static_cast<jsize>(width) * static_cast<jsize>(height);
+    if (y_length != expected_y) {
+        return env->NewByteArray(0);
+    }
+
+    jboolean is_copy = JNI_FALSE;
+    jbyte* y_bytes = env->GetByteArrayElements(yPlane, &is_copy);
+    if (y_bytes == nullptr) {
+        return env->NewByteArray(0);
+    }
+
+    const size_t pixel_count = static_cast<size_t>(width) * static_cast<size_t>(height);
+    std::vector<uint32_t> out_pixels(pixel_count);
+    for (size_t i = 0; i < pixel_count; ++i) {
+        const uint8_t y = static_cast<uint8_t>(y_bytes[i]);
+        out_pixels[i] =
+                (0xFFu << 24) |
+                (static_cast<uint32_t>(y) << 16) |
+                (static_cast<uint32_t>(y) << 8) |
+                static_cast<uint32_t>(y);
+    }
+
+    env->ReleaseByteArrayElements(yPlane, y_bytes, JNI_ABORT);
+
+    jbyteArray output = env->NewByteArray(expected_y * 4);
+    if (output == nullptr) {
+        return env->NewByteArray(0);
+    }
+    env->SetByteArrayRegion(
+            output,
+            0,
+            expected_y * 4,
+            reinterpret_cast<const jbyte*>(out_pixels.data()));
+    return output;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_example_image_1filter_1intention_MainActivity_applyNegative(
         JNIEnv* env,
         jobject /* this */,

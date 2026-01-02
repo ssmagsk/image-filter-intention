@@ -16,14 +16,14 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,10 +49,10 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.launch
-import java.nio.ByteBuffer
-import java.io.File
 import androidx.core.graphics.createBitmap
+import kotlinx.coroutines.launch
+import java.io.File
+import java.nio.ByteBuffer
 
 class MainActivity : ComponentActivity() {
 
@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
                             when (filter.id) {
                                 FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
                                 FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
+                                FilterIds.YuvGrayscale -> processWithYuvGrayscale(bmp)
                                 else -> processWithNative(bmp, ::applyNegative)
                             }
                         },
@@ -87,6 +88,7 @@ class MainActivity : ComponentActivity() {
      */
     external fun applyGrayscale(input: ByteArray, width: Int, height: Int): ByteArray
     external fun applyNegative(input: ByteArray, width: Int, height: Int): ByteArray
+    external fun applyGrayscaleYuv(yPlane: ByteArray, width: Int, height: Int): ByteArray
 
     companion object {
         // Used to load the 'image_filter_intention' library on application startup.
@@ -124,18 +126,56 @@ class MainActivity : ComponentActivity() {
             null
         }
     }
+
+    private fun processWithYuvGrayscale(source: Bitmap): Bitmap? {
+        val argb = if (source.config == Bitmap.Config.ARGB_8888) {
+            source
+        } else {
+            source.copy(Bitmap.Config.ARGB_8888, /* mutable = */ false)
+        } ?: return null
+
+        val width = argb.width
+        val height = argb.height
+        val pixelCount = width * height
+        val ints = IntArray(pixelCount)
+        argb.getPixels(ints, 0, width, 0, 0, width, height)
+
+        val yPlane = ByteArray(pixelCount)
+        for (i in 0 until pixelCount) {
+            val px = ints[i]
+            val r = (px shr 16) and 0xFF
+            val g = (px shr 8) and 0xFF
+            val b = px and 0xFF
+            val y = (299 * r + 587 * g + 114 * b + 500) / 1000
+            yPlane[i] = y.toByte()
+        }
+
+        return try {
+            val outputArray = applyGrayscaleYuv(yPlane, width, height)
+            if (outputArray.size != pixelCount * 4) return null
+            val outBuffer = ByteBuffer.wrap(outputArray)
+            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                copyPixelsFromBuffer(outBuffer)
+            }
+        } catch (t: Throwable) {
+            Log.e("NDK", "YUV grayscale processing failed", t)
+            null
+        }
+    }
 }
 
 private object FilterIds {
     const val Negative = "negative"
     const val Grayscale = "grayscale"
+    const val YuvGrayscale = "yuv_grayscale"
 }
 
 private data class FilterOption(val id: String, val label: String)
 
 private fun filterOptions(): List<FilterOption> = listOf(
     FilterOption(FilterIds.Negative, "Negative"),
-    FilterOption(FilterIds.Grayscale, "Grayscale")
+    FilterOption(FilterIds.Grayscale, "Grayscale"),
+    FilterOption(FilterIds.YuvGrayscale, "Y Gray (YUV)")
 )
 
 @Composable
