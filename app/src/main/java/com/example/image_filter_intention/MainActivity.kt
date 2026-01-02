@@ -368,7 +368,8 @@ private fun CameraXScreen(
                     faceLandmarks?.let { landmarks ->
                         Canvas(
                             modifier = Modifier
-                                .matchParentSize()
+                                .fillMaxSize()
+                                .padding(vertical = 16.dp)
                         ) {
                             val w = size.width
                             val h = size.height
@@ -376,8 +377,8 @@ private fun CameraXScreen(
                             val imgH = liveBitmap?.height?.toFloat() ?: h
                             fun drawPoint(p: PointF?, color: Color) {
                                 if (p == null) return
-                                val sx = p.x / imgW * w
-                                val sy = p.y / imgH * h
+                                val sx = p.x / imgW * w + 125
+                                val sy = p.y / imgH * h - 125
                                 drawCircle(color = color, radius = 8f, center = Offset(sx, sy))
                             }
                             drawPoint(landmarks.leftEye, Color.Green)
