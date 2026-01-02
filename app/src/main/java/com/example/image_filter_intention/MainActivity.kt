@@ -12,8 +12,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
@@ -49,7 +47,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.launch
 import java.io.File
 import java.nio.ByteBuffer
@@ -118,7 +115,7 @@ class MainActivity : ComponentActivity() {
             val outputArray = nativeFn(inputArray, width, height)
             if (outputArray.size != capacity) return null
             val outBuffer = ByteBuffer.wrap(outputArray)
-            createBitmap(width, height).apply {
+            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
                 copyPixelsFromBuffer(outBuffer)
             }
         } catch (t: Throwable) {
@@ -195,17 +192,10 @@ private fun CameraXScreen(
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var imageRotation by remember { mutableFloatStateOf(-90f) }
 
-
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasPermission = granted
-    }
-
-    val cameraSelector = remember(lensFacing) {
-        CameraSelector.Builder()
-            .requireLensFacing(lensFacing)
-            .build()
     }
 
     val imageCapture = remember {
@@ -215,6 +205,17 @@ private fun CameraXScreen(
     }
 
     val previewView = remember { PreviewView(context) }
+    val cameraManager = remember {
+        CameraXManager(
+            context = context,
+            lifecycleOwner = lifecycleOwner,
+            previewView = previewView,
+            lensFacing = lensFacing
+        ) { image ->
+            // Placeholder: analysis can be wired here later
+            image.close()
+        }
+    }
 
     LaunchedEffect(hasPermission, permissionRequested) {
         if (!hasPermission && !permissionRequested) {
@@ -223,37 +224,25 @@ private fun CameraXScreen(
         }
     }
 
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            cameraManager.setImageCapture(imageCapture)
+            cameraManager.start()
+        }
+    }
+
+    LaunchedEffect(lensFacing) {
+        if (hasPermission) {
+            cameraManager.switchLens()
+        }
+    }
+
     LaunchedEffect(lastBitmap) {
         imageRotation = if (lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
     }
 
-    DisposableEffect(lifecycleOwner, hasPermission, lensFacing) {
-        if (!hasPermission) {
-            return@DisposableEffect onDispose { }
-        }
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        val executor = ContextCompat.getMainExecutor(context)
-        val listener = Runnable {
-            val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            cameraProvider.unbindAll()
-            try {
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    cameraSelector,
-                    preview,
-                    imageCapture
-                )
-            } catch (_: Exception) {
-                // TODO: surface to UI/log if needed
-            }
-        }
-        cameraProviderFuture.addListener(listener, executor)
-        onDispose {
-            runCatching { cameraProviderFuture.get().unbindAll() }
-        }
+    DisposableEffect(Unit) {
+        onDispose { cameraManager.stop() }
     }
 
     Box(
