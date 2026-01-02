@@ -3,14 +3,6 @@
 #include <vector>
 #include <cstdint>
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_image_1filter_1intention_MainActivity_stringFromJNI(
-        JNIEnv* env,
-        jobject /* this */) {
-    std::string hello = "Hello from C++";
-    return env->NewStringUTF(hello.c_str());
-}
-
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_example_image_1filter_1intention_MainActivity_applyGrayscale(
         JNIEnv* env,
