@@ -59,8 +59,12 @@ class FaceRecognizer(
         val left = getLandmark(FaceLandmarksConst.LEFT_EYE)?.position
         val right = getLandmark(FaceLandmarksConst.RIGHT_EYE)?.position
         val mouthBot = getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position
+            // HACK ADDING THE 25
+            ?.let { PointF(it.x, it.y - 25f) }
         val mouthR = getLandmark(FaceLandmark.MOUTH_RIGHT)?.position
+            ?.let { PointF(it.x, it.y - 25f) }
         val mouthL = getLandmark(FaceLandmark.MOUTH_LEFT)?.position
+            ?.let { PointF(it.x, it.y - 25f) }
         return FaceLandmarks(left, right, mouthBot, mouthR, mouthL)
     }
 
