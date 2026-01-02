@@ -48,6 +48,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.image_filter_intention.converter.CPUImageConverter
 import com.example.image_filter_intention.converter.GPUImageConverter
 import com.example.image_filter_intention.converter.IImageConverter
+import com.example.image_filter_intention.gpu.GPUBloom
 import java.nio.ByteBuffer
 
 class MainActivity : ComponentActivity() {
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
                         FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
                         FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
                         FilterIds.Bloom -> processWithNative(bmp, ::applyBloom)
+                        FilterIds.GPUBloom -> processWithGpuBloom(bmp)
                         FilterIds.YuvGrayscale -> processWithYuvGrayscale(bmp)
                         else -> processWithNative(bmp, ::applyNegative)
                             }
@@ -127,6 +129,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun processWithGpuBloom(source: Bitmap): Bitmap? {
+        val argb = if (source.config == Bitmap.Config.ARGB_8888) {
+            source
+        } else {
+            source.copy(Bitmap.Config.ARGB_8888, /* mutable = */ false)
+        } ?: return null
+
+        val width = argb.width
+        val height = argb.height
+        val capacity = width * height * 4
+        val buffer = ByteBuffer.allocate(capacity)
+        argb.copyPixelsToBuffer(buffer)
+        val inputArray = buffer.array()
+
+        val gpuBloom = GPUBloom()
+        val outBytes = gpuBloom.applyBloom(inputArray, width, height) ?: return null
+        if (outBytes.size != capacity) return null
+        val outBuffer = ByteBuffer.wrap(outBytes)
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            copyPixelsFromBuffer(outBuffer)
+        }
+    }
+
     private fun processWithYuvGrayscale(source: Bitmap): Bitmap? {
         val argb = if (source.config == Bitmap.Config.ARGB_8888) {
             source
@@ -168,6 +193,7 @@ private object FilterIds {
     const val Negative = "negative"
     const val Grayscale = "grayscale"
     const val Bloom = "bloom"
+    const val GPUBloom = "gpu_bloom"
     const val YuvGrayscale = "yuv_grayscale"
 }
 
@@ -177,6 +203,7 @@ private fun filterOptions(): List<FilterOption> = listOf(
     FilterOption(FilterIds.Negative, "Negative"),
     FilterOption(FilterIds.Grayscale, "Grayscale"),
     FilterOption(FilterIds.Bloom, "Bloom"),
+    FilterOption(FilterIds.GPUBloom, "GPU Bloom"),
     FilterOption(FilterIds.YuvGrayscale, "Y Gray (YUV)")
 )
 
