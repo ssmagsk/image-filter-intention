@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
@@ -49,6 +50,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.image_filter_intention.converter.CPUImageConverter
 import com.example.image_filter_intention.converter.IImageConverter
+import com.example.image_filter_intention.CameraXManager
 import kotlinx.coroutines.launch
 import java.io.File
 import java.nio.ByteBuffer
@@ -188,10 +190,12 @@ private fun CameraXScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
+    val imageConverter: IImageConverter = remember { CPUImageConverter() }
 
     var hasPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var liveBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedFilter by remember { mutableStateOf(filters.first()) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var imageRotation by remember { mutableFloatStateOf(-90f) }
@@ -209,14 +213,15 @@ private fun CameraXScreen(
     }
 
     val previewView = remember { PreviewView(context) }
-    val cameraManager = remember {
+    val cameraManager = remember(lensFacing) {
         CameraXManager(
             context = context,
             lifecycleOwner = lifecycleOwner,
             previewView = previewView,
             lensFacing = lensFacing
-        ) { image ->
-            // Placeholder: analysis can be wired here later
+        ) { image: ImageProxy ->
+            val rgba = imageConverter.yuvToRgba(image)
+            liveBitmap = rgba?.let { imageConverter.rgbaToBitmap(it) }
             image.close()
         }
     }
@@ -232,12 +237,6 @@ private fun CameraXScreen(
         if (hasPermission) {
             cameraManager.setImageCapture(imageCapture)
             cameraManager.start()
-        }
-    }
-
-    LaunchedEffect(lensFacing) {
-        if (hasPermission) {
-            cameraManager.switchLens()
         }
     }
 
@@ -268,6 +267,15 @@ private fun CameraXScreen(
                     factory = { previewView },
                     modifier = Modifier.matchParentSize()
                 )
+//                liveBitmap?.let { bmp ->
+//                    Image(
+//                        bitmap = bmp.asImageBitmap(),
+//                        contentDescription = "Live processed",
+//                        modifier = Modifier
+//                            .matchParentSize()
+//                            .rotate(imageRotation)
+//                    )
+//                }
                 Button(
                     onClick = {
                         lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
@@ -275,6 +283,7 @@ private fun CameraXScreen(
                         } else {
                             CameraSelector.LENS_FACING_FRONT
                         }
+                        cameraManager.switchLens()
                     },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -310,7 +319,7 @@ private fun CameraXScreen(
                     }
                 }
             }
-            lastBitmap?.let { bmp ->
+            processBitmap(liveBitmap ?: return, selectedFilter)?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = "Last captured preview",
