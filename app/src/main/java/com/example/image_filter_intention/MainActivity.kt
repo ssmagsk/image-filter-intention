@@ -2,11 +2,18 @@ package com.example.image_filter_intention
 
 import android.Manifest
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,15 +29,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : ComponentActivity() {
 
@@ -43,7 +57,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    CaptureScreen(
+                    CameraXScreen(
                         nativeBanner = stringFromJNI(),
                         onBitmapCaptured = { bitmap ->
                             // TODO: Pass bitmap to NDK for processing (grayscale filter)
@@ -69,26 +83,63 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CaptureScreen(
+private fun CameraXScreen(
     nativeBanner: String,
     onBitmapCaptured: (Bitmap) -> Unit
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var hasPermission by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        bitmap?.let {
-            lastBitmap = it
-            onBitmapCaptured(it)
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            cameraLauncher.launch(null)
+        hasPermission = granted
+    }
+
+    val cameraSelector = remember {
+        CameraSelector.Builder()
+            .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+            .build()
+    }
+
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .build()
+    }
+
+    val previewView = remember { PreviewView(context) }
+
+    DisposableEffect(lifecycleOwner, hasPermission) {
+        if (!hasPermission) {
+            return@DisposableEffect onDispose { }
+        }
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        val executor = ContextCompat.getMainExecutor(context)
+        val listener = Runnable {
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+            cameraProvider.unbindAll()
+            try {
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
+            } catch (_: Exception) {
+                // TODO: surface to UI/log if needed
+            }
+        }
+        cameraProviderFuture.addListener(listener, executor)
+        onDispose {
+            runCatching { cameraProviderFuture.get().unbindAll() }
         }
     }
 
@@ -104,6 +155,12 @@ private fun CaptureScreen(
         ) {
             Text(text = nativeBanner, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(16.dp))
+            AndroidView(
+                factory = { previewView },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(bottom = 16.dp)
+            )
             lastBitmap?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
@@ -116,7 +173,40 @@ private fun CaptureScreen(
         }
 
         Button(
-            onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+            onClick = {
+                if (!hasPermission) {
+                    requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+                } else {
+                    val output = File.createTempFile(
+                        "capture-",
+                        ".jpg",
+                        context.cacheDir
+                    )
+                    val outputOptions = ImageCapture.OutputFileOptions.Builder(output).build()
+                    val executor = ContextCompat.getMainExecutor(context)
+                    imageCapture.takePicture(
+                        outputOptions,
+                        executor,
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                coroutineScope.launch {
+                                    runCatching {
+                                        BitmapFactory.decodeFile(output.absolutePath)
+                                    }.getOrNull()?.let { bmp ->
+                                        lastBitmap = bmp
+                                        onBitmapCaptured(bmp)
+                                    }
+                                    output.delete()
+                                }
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                // TODO: show error UI/log
+                            }
+                        }
+                    )
+                }
+            },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 24.dp)
@@ -127,13 +217,5 @@ private fun CaptureScreen(
         ) {
             Text(text = "Open Camera")
         }
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-private fun CaptureScreenPreview() {
-    MaterialTheme {
-        CaptureScreen(nativeBanner = "Hello from native!") { }
     }
 }
