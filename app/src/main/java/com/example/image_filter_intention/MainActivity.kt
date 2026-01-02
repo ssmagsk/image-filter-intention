@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -63,8 +66,15 @@ class MainActivity : ComponentActivity() {
                 ) {
                     CameraXScreen(
                         nativeBanner = stringFromJNI(),
-                        processBitmap = { bmp -> processWithNative(bmp, ::applyNegative) },
-                        onBitmapCaptured = { /* hook for further actions if needed */ }
+                            filters = filterOptions(),
+                            processBitmap = { bmp, filter ->
+                                when (filter.id) {
+                                    FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
+                                    FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
+                                    else -> processWithNative(bmp, ::applyNegative)
+                                }
+                            },
+                            onBitmapCaptured = { /* hook for further actions if needed */ }
                     )
                 }
             }
@@ -117,10 +127,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private object FilterIds {
+    const val Negative = "negative"
+    const val Grayscale = "grayscale"
+}
+
+private data class FilterOption(val id: String, val label: String)
+
+private fun filterOptions(): List<FilterOption> = listOf(
+    FilterOption(FilterIds.Negative, "Negative"),
+    FilterOption(FilterIds.Grayscale, "Grayscale")
+)
+
 @Composable
 private fun CameraXScreen(
     nativeBanner: String,
-    processBitmap: (Bitmap) -> Bitmap?,
+    filters: List<FilterOption>,
+    processBitmap: (Bitmap, FilterOption) -> Bitmap?,
     onBitmapCaptured: (Bitmap) -> Unit
 ) {
     val context = LocalContext.current
@@ -130,6 +153,7 @@ private fun CameraXScreen(
     var hasPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var selectedFilter by remember { mutableStateOf(filters.first()) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -197,14 +221,41 @@ private fun CameraXScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize()
         ) {
-            Text(text = nativeBanner, style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-            AndroidView(
-                factory = { previewView },
+//            Text(text = nativeBanner, style = MaterialTheme.typography.titleMedium)
+//            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.weight(5f)
+            ) {
+                AndroidView(
+                    factory = { previewView },
+                    modifier = Modifier
+                        .padding(bottom = 16.dp)
+                )
+            }
+            Row(
                 modifier = Modifier
+                    .fillMaxSize()
                     .weight(1f)
-                    .padding(bottom = 16.dp)
-            )
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                filters.forEach { filter ->
+                    val isSelected = filter.id == selectedFilter.id
+                    Button(
+                        onClick = { selectedFilter = filter },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            }
+                        )
+                    ) {
+                        Text(text = filter.label)
+                    }
+                }
+            }
             lastBitmap?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
@@ -212,6 +263,7 @@ private fun CameraXScreen(
                     modifier = Modifier
                         // HACK(ATHON) BECAUSE IMAGE GETS CAPTURED AN AN ANGLE
                         .rotate(-90f)
+                        .weight(5f)
                         .widthIn(max = 360.dp)
                         .padding(vertical = 16.dp)
                 )
@@ -239,7 +291,7 @@ private fun CameraXScreen(
                                     runCatching {
                                         BitmapFactory.decodeFile(output.absolutePath)
                                     }.getOrNull()?.let { bmp ->
-                                        val processed = processBitmap(bmp)
+                                        val processed = processBitmap(bmp, selectedFilter)
                                         lastBitmap = processed ?: bmp
                                         onBitmapCaptured(lastBitmap!!)
                                     }
