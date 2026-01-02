@@ -17,7 +17,7 @@ class CameraXManager(
     private val context: Context,
     private val lifecycleOwner: LifecycleOwner,
     private val previewView: PreviewView,
-    private var lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
+    var lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
     private val analyzerCallback: (ImageProxy) -> Unit
 ) {
 

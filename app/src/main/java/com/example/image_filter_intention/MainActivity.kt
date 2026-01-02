@@ -2,7 +2,6 @@ package com.example.image_filter_intention
 
 import android.Manifest
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -11,7 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
@@ -47,12 +45,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import com.example.image_filter_intention.converter.CPUImageConverter
+import com.example.image_filter_intention.converter.GPUImageConverter
 import com.example.image_filter_intention.converter.IImageConverter
-import com.example.image_filter_intention.CameraXManager
-import kotlinx.coroutines.launch
-import java.io.File
 import java.nio.ByteBuffer
 
 class MainActivity : ComponentActivity() {
@@ -98,7 +93,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val imageConverter: IImageConverter = CPUImageConverter()
+    private val imageConverter: IImageConverter = GPUImageConverter()
 
     private fun processWithNative(
         source: Bitmap,
@@ -213,7 +208,7 @@ private fun CameraXScreen(
     }
 
     val previewView = remember { PreviewView(context) }
-    val cameraManager = remember(lensFacing) {
+    val cameraManager = remember {
         CameraXManager(
             context = context,
             lifecycleOwner = lifecycleOwner,
@@ -240,8 +235,8 @@ private fun CameraXScreen(
         }
     }
 
-    LaunchedEffect(lastBitmap) {
-        imageRotation = if (lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
+    LaunchedEffect(cameraManager.lensFacing) {
+        imageRotation = if (cameraManager.lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
     }
 
     DisposableEffect(Unit) {
@@ -267,15 +262,6 @@ private fun CameraXScreen(
                     factory = { previewView },
                     modifier = Modifier.matchParentSize()
                 )
-//                liveBitmap?.let { bmp ->
-//                    Image(
-//                        bitmap = bmp.asImageBitmap(),
-//                        contentDescription = "Live processed",
-//                        modifier = Modifier
-//                            .matchParentSize()
-//                            .rotate(imageRotation)
-//                    )
-//                }
                 Button(
                     onClick = {
                         lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
@@ -338,39 +324,39 @@ private fun CameraXScreen(
                     .padding(bottom = 24.dp)
                     .widthIn(min = 240.dp),
                 onClick = {
-                    if (!hasPermission) {
-                        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    } else {
-                        val output = File.createTempFile(
-                            "capture-",
-                            ".jpg",
-                            context.cacheDir
-                        )
-                        val outputOptions = ImageCapture.OutputFileOptions.Builder(output).build()
-                        val executor = ContextCompat.getMainExecutor(context)
-                        imageCapture.takePicture(
-                            outputOptions,
-                            executor,
-                            object : ImageCapture.OnImageSavedCallback {
-                                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                    coroutineScope.launch {
-                                        runCatching {
-                                            BitmapFactory.decodeFile(output.absolutePath)
-                                        }.getOrNull()?.let { bmp ->
-                                            val processed = processBitmap(bmp, selectedFilter)
-                                            lastBitmap = processed ?: bmp
-                                            onBitmapCaptured(lastBitmap!!)
-                                        }
-                                        output.delete()
-                                    }
-                                }
-
-                                override fun onError(exception: ImageCaptureException) {
-                                    // TODO: show error UI/log
-                                }
-                            }
-                        )
-                    }
+//                    if (!hasPermission) {
+//                        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+//                    } else {
+//                        val output = File.createTempFile(
+//                            "capture-",
+//                            ".jpg",
+//                            context.cacheDir
+//                        )
+//                        val outputOptions = ImageCapture.OutputFileOptions.Builder(output).build()
+//                        val executor = ContextCompat.getMainExecutor(context)
+//                        imageCapture.takePicture(
+//                            outputOptions,
+//                            executor,
+//                            object : ImageCapture.OnImageSavedCallback {
+//                                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+//                                    coroutineScope.launch {
+//                                        runCatching {
+//                                            BitmapFactory.decodeFile(output.absolutePath)
+//                                        }.getOrNull()?.let { bmp ->
+//                                            val processed = processBitmap(bmp, selectedFilter)
+//                                            lastBitmap = processed ?: bmp
+//                                            onBitmapCaptured(lastBitmap!!)
+//                                        }
+//                                        output.delete()
+//                                    }
+//                                }
+//
+//                                override fun onError(exception: ImageCaptureException) {
+//                                    // TODO: show error UI/log
+//                                }
+//                            }
+//                        )
+//                    }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
