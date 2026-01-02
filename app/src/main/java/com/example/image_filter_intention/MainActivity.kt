@@ -66,15 +66,15 @@ class MainActivity : ComponentActivity() {
                 ) {
                     CameraXScreen(
                         nativeBanner = stringFromJNI(),
-                            filters = filterOptions(),
-                            processBitmap = { bmp, filter ->
-                                when (filter.id) {
-                                    FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
-                                    FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
-                                    else -> processWithNative(bmp, ::applyNegative)
-                                }
-                            },
-                            onBitmapCaptured = { /* hook for further actions if needed */ }
+                        filters = filterOptions(),
+                        processBitmap = { bmp, filter ->
+                            when (filter.id) {
+                                FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
+                                FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
+                                else -> processWithNative(bmp, ::applyNegative)
+                            }
+                        },
+                        onBitmapCaptured = { /* hook for further actions if needed */ }
                     )
                 }
             }
@@ -268,53 +268,53 @@ private fun CameraXScreen(
                         .padding(vertical = 16.dp)
                 )
             }
-        }
 
-        Button(
-            onClick = {
-                if (!hasPermission) {
-                    requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-                } else {
-                    val output = File.createTempFile(
-                        "capture-",
-                        ".jpg",
-                        context.cacheDir
-                    )
-                    val outputOptions = ImageCapture.OutputFileOptions.Builder(output).build()
-                    val executor = ContextCompat.getMainExecutor(context)
-                    imageCapture.takePicture(
-                        outputOptions,
-                        executor,
-                        object : ImageCapture.OnImageSavedCallback {
-                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                coroutineScope.launch {
-                                    runCatching {
-                                        BitmapFactory.decodeFile(output.absolutePath)
-                                    }.getOrNull()?.let { bmp ->
-                                        val processed = processBitmap(bmp, selectedFilter)
-                                        lastBitmap = processed ?: bmp
-                                        onBitmapCaptured(lastBitmap!!)
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(bottom = 24.dp)
+                    .widthIn(min = 240.dp),
+                onClick = {
+                    if (!hasPermission) {
+                        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    } else {
+                        val output = File.createTempFile(
+                            "capture-",
+                            ".jpg",
+                            context.cacheDir
+                        )
+                        val outputOptions = ImageCapture.OutputFileOptions.Builder(output).build()
+                        val executor = ContextCompat.getMainExecutor(context)
+                        imageCapture.takePicture(
+                            outputOptions,
+                            executor,
+                            object : ImageCapture.OnImageSavedCallback {
+                                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                    coroutineScope.launch {
+                                        runCatching {
+                                            BitmapFactory.decodeFile(output.absolutePath)
+                                        }.getOrNull()?.let { bmp ->
+                                            val processed = processBitmap(bmp, selectedFilter)
+                                            lastBitmap = processed ?: bmp
+                                            onBitmapCaptured(lastBitmap!!)
+                                        }
+                                        output.delete()
                                     }
-                                    output.delete()
+                                }
+
+                                override fun onError(exception: ImageCaptureException) {
+                                    // TODO: show error UI/log
                                 }
                             }
-
-                            override fun onError(exception: ImageCaptureException) {
-                                // TODO: show error UI/log
-                            }
-                        }
-                    )
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
-                .widthIn(min = 240.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Text(text = "Snappity Snap")
+                        )
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(text = "Snappity Snap")
+            }
         }
     }
 }
