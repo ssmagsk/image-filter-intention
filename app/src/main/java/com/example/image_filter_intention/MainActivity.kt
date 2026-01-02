@@ -2,6 +2,7 @@ package com.example.image_filter_intention
 
 import android.Manifest
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -12,6 +13,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -40,14 +43,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.image_filter_intention.converter.CPUImageConverter
 import com.example.image_filter_intention.converter.GPUImageConverter
 import com.example.image_filter_intention.converter.IImageConverter
+import com.example.image_filter_intention.face.FaceLandmarks
+import com.example.image_filter_intention.face.FaceRecognizer
 import com.example.image_filter_intention.gpu.GPUBloom
 import java.nio.ByteBuffer
 
@@ -214,16 +223,18 @@ private fun CameraXScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-    val imageConverter: IImageConverter = remember { GPUImageConverter() }
+    val imageConverter: IImageConverter = remember { CPUImageConverter() }
 
     var hasPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
     var lastBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var liveBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var faceLandmarks by remember { mutableStateOf<FaceLandmarks?>(null) }
     var selectedFilter by remember { mutableStateOf(filters.first()) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var imageRotation by remember { mutableFloatStateOf(-90f) }
 
+    val faceRecognizer = remember { FaceRecognizer() }
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -246,7 +257,9 @@ private fun CameraXScreen(
         ) { image: ImageProxy ->
             val rgba = imageConverter.yuvToRgba(image)
             liveBitmap = rgba?.let { imageConverter.rgbaToBitmap(it) }
-            image.close()
+            faceRecognizer.process(image) { landmarks ->
+                faceLandmarks = landmarks
+            }
         }
     }
 
@@ -265,7 +278,8 @@ private fun CameraXScreen(
     }
 
     LaunchedEffect(cameraManager.lensFacing) {
-        imageRotation = if (cameraManager.lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
+        imageRotation =
+            if (cameraManager.lensFacing == CameraSelector.LENS_FACING_FRONT) -90f else 90f
     }
 
     DisposableEffect(Unit) {
@@ -335,16 +349,43 @@ private fun CameraXScreen(
                 }
             }
             processBitmap(liveBitmap ?: return, selectedFilter)?.let { bmp ->
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Filtered preview",
+                Box(
                     modifier = Modifier
-                        // HACK(ATHON) BECAUSE IMAGE GETS CAPTURED AN AN ANGLE
-                        .rotate(imageRotation)
                         .weight(5f)
-                        .widthIn(max = 360.dp)
-                        .padding(vertical = 16.dp)
-                )
+                        .padding(bottom = 16.dp)
+                ) {
+
+                    // Landmark overlay (basic)
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = "Filtered preview",
+                        modifier = Modifier
+                            // HACK(ATHON) BECAUSE IMAGE GETS CAPTURED AN AN ANGLE
+                            .fillMaxSize()
+                            .rotate(imageRotation)
+                            .padding(vertical = 16.dp)
+                    )
+                    faceLandmarks?.let { landmarks ->
+                        Canvas(
+                            modifier = Modifier
+                                .matchParentSize()
+                        ) {
+                            val w = size.width
+                            val h = size.height
+                            val imgW = liveBitmap?.width?.toFloat() ?: w
+                            val imgH = liveBitmap?.height?.toFloat() ?: h
+                            fun drawPoint(p: PointF?, color: Color) {
+                                if (p == null) return
+                                val sx = p.x / imgW * w
+                                val sy = p.y / imgH * h
+                                drawCircle(color = color, radius = 8f, center = Offset(sx, sy))
+                            }
+                            drawPoint(landmarks.leftEye, Color.Green)
+                            drawPoint(landmarks.rightEye, Color.Blue)
+                            drawPoint(landmarks.mouth, Color.Red)
+                        }
+                    }
+                }
             }
         }
     }
