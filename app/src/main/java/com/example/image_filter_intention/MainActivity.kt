@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     CameraXScreen(
                         nativeBanner = stringFromJNI(),
-                        processBitmap = ::processWithNativeGrayscale,
+                        processBitmap = ::processWithNativeNegative,
                         onBitmapCaptured = { bitmap ->
                             // TODO: Pass bitmap to NDK for processing (grayscale filter)
                         }
@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
      */
     external fun stringFromJNI(): String
     external fun applyGrayscale(input: ByteArray, width: Int, height: Int): ByteArray
+    external fun applyNegative(input: ByteArray, width: Int, height: Int): ByteArray
 
     companion object {
         // Used to load the 'image_filter_intention' library on application startup.
@@ -108,6 +109,33 @@ class MainActivity : ComponentActivity() {
             result
         } catch (t: Throwable) {
             Log.e("NDK", "Grayscale processing failed", t)
+            null
+        }
+    }
+
+    private fun processWithNativeNegative(source: Bitmap): Bitmap? {
+        val argb = if (source.config == Bitmap.Config.ARGB_8888) {
+            source
+        } else {
+            source.copy(Bitmap.Config.ARGB_8888, /* mutable = */ false)
+        } ?: return null
+
+        val width = argb.width
+        val height = argb.height
+        val capacity = width * height * 4
+        val buffer = ByteBuffer.allocate(capacity)
+        argb.copyPixelsToBuffer(buffer)
+        val inputArray = buffer.array()
+
+        return try {
+            val outputArray = applyNegative(inputArray, width, height)
+            if (outputArray.size != capacity) return null
+            val outBuffer = ByteBuffer.wrap(outputArray)
+            val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            result.copyPixelsFromBuffer(outBuffer)
+            result
+        } catch (t: Throwable) {
+            Log.e("NDK", "Negative processing failed", t)
             null
         }
     }
