@@ -10,11 +10,13 @@ import androidx.camera.core.ImageProxy
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import androidx.core.graphics.createBitmap
 
 /**
  * GPU YUV->RGBA converter (offscreen GL). Falls back to CPU if GL init fails.
  * Note: For production, prefer sharing textures with your render path and avoid readPixels.
  */
+// TODO: FIX IT. DOESNT WORK
 class GPUImageConverter() : IImageConverter {
 
     override fun yuvToRgba(image: ImageProxy): RgbaBuffer? {
@@ -68,8 +70,11 @@ class GPUImageConverter() : IImageConverter {
     }
 
     override fun rgbaToBitmap(buffer: RgbaBuffer): Bitmap {
-        // GPU path would normally render to a texture; fallback to CPU bitmap creation.
-        throw UnsupportedOperationException()
+        // Convert RGBA byte buffer to a Bitmap (GPU path renders offscreen, readPixels already done).
+        val outBuffer = ByteBuffer.wrap(buffer.bytes)
+        return createBitmap(buffer.width, buffer.height).apply {
+            copyPixelsFromBuffer(outBuffer)
+        }
     }
 
     private fun uploadLuma(texId: Int, w: Int, h: Int, buf: ByteBuffer, rowStride: Int, pixelStride: Int) {
@@ -208,23 +213,23 @@ class GPUImageConverter() : IImageConverter {
         private const val VS = """
             attribute vec4 aPosition;
             attribute vec2 aTexCoord;
-            varying vec2 vTex;
+            varying vec2 vTexCoord;
             void main() {
-                vTex = aTexCoord;
+                vTexCoord = aTexCoord;
                 gl_Position = aPosition;
             }
         """
 
         private const val FS = """
             precision mediump float;
-            varying vec2 vTex;
+            varying vec2 vTexCoord;
             uniform sampler2D yTex;
             uniform sampler2D uTex;
             uniform sampler2D vTex;
             void main() {
-                float y = texture2D(yTex, vTex).r;
-                float u = texture2D(uTex, vTex).r - 0.5;
-                float v = texture2D(vTex, vTex).r - 0.5;
+                float y = texture2D(yTex, vTexCoord).r;
+                float u = texture2D(uTex, vTexCoord).r - 0.5;
+                float v = texture2D(vTex, vTexCoord).r - 0.5;
                 float r = y + 1.370705 * v;
                 float g = y - 0.337633 * u - 0.698001 * v;
                 float b = y + 1.732446 * u;

@@ -97,8 +97,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val imageConverter: IImageConverter = GPUImageConverter()
-
     private fun processWithNative(
         source: Bitmap,
         nativeFn: (ByteArray, Int, Int) -> ByteArray
@@ -216,7 +214,7 @@ private fun CameraXScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-    val imageConverter: IImageConverter = remember { CPUImageConverter() }
+    val imageConverter: IImageConverter = remember { GPUImageConverter() }
 
     var hasPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
