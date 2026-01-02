@@ -23,7 +23,7 @@ class CameraXManager(
 
     private var cameraProvider: ProcessCameraProvider? = null
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
-    private var imageCapture: androidx.camera.core.ImageCapture? = null
+    private var imageCapture: ImageCapture? = null
 
     fun start() {
         val future = ProcessCameraProvider.getInstance(context)
