@@ -65,10 +65,11 @@ class MainActivity : ComponentActivity() {
                         filters = filterOptions(),
                         processBitmap = { bmp, filter ->
                             when (filter.id) {
-                                FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
-                                FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
-                                FilterIds.YuvGrayscale -> processWithYuvGrayscale(bmp)
-                                else -> processWithNative(bmp, ::applyNegative)
+                        FilterIds.Negative -> processWithNative(bmp, ::applyNegative)
+                        FilterIds.Grayscale -> processWithNative(bmp, ::applyGrayscale)
+                        FilterIds.Bloom -> processWithNative(bmp, ::applyBloom)
+                        FilterIds.YuvGrayscale -> processWithYuvGrayscale(bmp)
+                        else -> processWithNative(bmp, ::applyNegative)
                             }
                         },
                         onBitmapCaptured = { /* hook for further actions if needed */ }
@@ -85,6 +86,7 @@ class MainActivity : ComponentActivity() {
     external fun applyGrayscale(input: ByteArray, width: Int, height: Int): ByteArray
     external fun applyNegative(input: ByteArray, width: Int, height: Int): ByteArray
     external fun applyGrayscaleYuv(yPlane: ByteArray, width: Int, height: Int): ByteArray
+    external fun applyBloom(input: ByteArray, width: Int, height: Int): ByteArray
 
     companion object {
         // Used to load the 'image_filter_intention' library on application startup.
@@ -165,6 +167,7 @@ class MainActivity : ComponentActivity() {
 private object FilterIds {
     const val Negative = "negative"
     const val Grayscale = "grayscale"
+    const val Bloom = "bloom"
     const val YuvGrayscale = "yuv_grayscale"
 }
 
@@ -173,6 +176,7 @@ private data class FilterOption(val id: String, val label: String)
 private fun filterOptions(): List<FilterOption> = listOf(
     FilterOption(FilterIds.Negative, "Negative"),
     FilterOption(FilterIds.Grayscale, "Grayscale"),
+    FilterOption(FilterIds.Bloom, "Bloom"),
     FilterOption(FilterIds.YuvGrayscale, "Y Gray (YUV)")
 )
 
