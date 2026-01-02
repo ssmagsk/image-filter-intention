@@ -47,6 +47,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.image_filter_intention.converter.CPUImageConverter
+import com.example.image_filter_intention.converter.IImageConverter
 import kotlinx.coroutines.launch
 import java.io.File
 import java.nio.ByteBuffer
@@ -93,6 +95,8 @@ class MainActivity : ComponentActivity() {
             System.loadLibrary("image_filter_intention")
         }
     }
+
+    private val imageConverter: IImageConverter = CPUImageConverter()
 
     private fun processWithNative(
         source: Bitmap,
