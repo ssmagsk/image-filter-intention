@@ -8,11 +8,14 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
 
 data class FaceLandmarks(
     val leftEye: PointF?,
     val rightEye: PointF?,
-    val mouth: PointF?
+    val mouthBottom: PointF?,
+    val mouthRight: PointF?,
+    val mouthLeft: PointF?,
 )
 
 class FaceRecognizer(
@@ -55,8 +58,10 @@ class FaceRecognizer(
     private fun Face.toLandmarks(): FaceLandmarks {
         val left = getLandmark(FaceLandmarksConst.LEFT_EYE)?.position
         val right = getLandmark(FaceLandmarksConst.RIGHT_EYE)?.position
-        val mouthPos = getLandmark(FaceLandmarksConst.MOUTH_BOTTOM)?.position
-        return FaceLandmarks(left, right, mouthPos)
+        val mouthBot = getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position
+        val mouthR = getLandmark(FaceLandmark.MOUTH_RIGHT)?.position
+        val mouthL = getLandmark(FaceLandmark.MOUTH_LEFT)?.position
+        return FaceLandmarks(left, right, mouthBot, mouthR, mouthL)
     }
 
     companion object {
@@ -86,6 +91,8 @@ private object FaceLandmarksIds {
 private object FaceLandmarksIdsInternal {
     const val LEFT_EYE = 4
     const val RIGHT_EYE = 10
-    const val MOUTH_BOTTOM = 20
+    const val MOUTH_BOTTOM = 0
+    const val MOUTH_RIGHT = 5
+    const val MOUTH_LEFT = 11
 }
 

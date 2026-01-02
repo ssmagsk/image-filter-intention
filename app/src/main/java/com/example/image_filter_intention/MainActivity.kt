@@ -21,9 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,14 +44,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.image_filter_intention.converter.CPUImageConverter
-import com.example.image_filter_intention.converter.GPUImageConverter
 import com.example.image_filter_intention.converter.IImageConverter
 import com.example.image_filter_intention.face.FaceLandmarks
 import com.example.image_filter_intention.face.FaceRecognizer
@@ -377,13 +372,17 @@ private fun CameraXScreen(
                             val imgH = liveBitmap?.height?.toFloat() ?: h
                             fun drawPoint(p: PointF?, color: Color) {
                                 if (p == null) return
+                                // HACK(ATHON) 125 because who knows ( How did I even figure this one out)
                                 val sx = p.x / imgW * w + 125
                                 val sy = p.y / imgH * h - 125
                                 drawCircle(color = color, radius = 8f, center = Offset(sx, sy))
                             }
                             drawPoint(landmarks.leftEye, Color.Green)
                             drawPoint(landmarks.rightEye, Color.Blue)
-                            drawPoint(landmarks.mouth, Color.Red)
+                            drawPoint(landmarks.mouthBottom, Color.Red)
+                            drawPoint(landmarks.mouthRight, Color.Red)
+                            drawPoint(landmarks.mouthLeft, Color.Red)
+
                         }
                     }
                 }
